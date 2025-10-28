@@ -1,2 +1,2 @@
 # Stoic-path.github.io
-url
+https://stoic-path.github.io
