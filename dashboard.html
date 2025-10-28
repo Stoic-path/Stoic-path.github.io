@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - PokeApi</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container dashboard">
+        <div class="header">
+            <div>
+                <h1>🎮 PokeApi</h1>
+                <p class="welcome">Welcome, <span id="username"></span>!</p>
+            </div>
+            <button class="secondary" id="logoutBtn">Logout</button>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Enter Pokemon name (e.g., pikachu, charizard)">
+            <button type="button" id="searchBtn">Search</button>
+        </div>
+
+        <div id="message"></div>
+
+        <div id="pokemonResult" class="pokemon-result">
+            <div id="pokemonPlaceholder" style="color: #999; padding: 40px;">
+                <p>🔍 Search for a Pokemon to see details</p>
+            </div>
+            <div id="pokemonContent" style="display: none;">
+                <img id="pokemonImage" src="" alt="Pokemon">
+                <h2 class="pokemon-name" id="pokemonName"></h2>
+                
+                <div class="pokemon-types" id="pokemonTypes"></div>
+                
+                <div class="pokemon-stats" id="pokemonStats"></div>
+                
+                <div style="margin-top: 20px; color: #666;">
+                    <p><strong>Height:</strong> <span id="pokemonHeight"></span> dm</p>
+                    <p><strong>Weight:</strong> <span id="pokemonWeight"></span> hg</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="history">
+            <h3>Search History</h3>
+            <div id="historyList" class="history-list">
+                <p style="text-align: center; color: #999;">No searches yet</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:3000/api' 
+    : '/api';
+    let currentUser = null;
+
+        // Check if user is logged in
+        window.addEventListener('DOMContentLoaded', () => {
+            const userData = localStorage.getItem('user');
+            
+            if (!userData) {
+                window.location.href = 'index.html';
+                return;
+            }
+
+            currentUser = JSON.parse(userData);
+            document.getElementById('username').textContent = currentUser.username;
+            
+            loadSearchHistory();
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            
+            try {
+                await fetch(`${API_URL}/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId: currentUser.userId })
+                });
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            
+            localStorage.removeItem('user');
+            window.location.href = 'index.html';
+        });
+
+        // Search Pokemon - Click event
+        document.getElementById('searchBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            searchPokemon();
+        });
+
+        // Search Pokemon - Enter key
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchPokemon();
+            }
+        });
+
+        async function searchPokemon() {
+            const pokemonName = document.getElementById('searchInput').value.trim().toLowerCase();
+            const messageDiv = document.getElementById('message');
+            const resultDiv = document.getElementById('pokemonResult');
+
+            if (!pokemonName) {
+                messageDiv.innerHTML = '<div class="error">Please enter a Pokemon name</div>';
+                setTimeout(() => {
+                    messageDiv.innerHTML = '';
+                }, 3000);
+                return;
+            }
+
+            messageDiv.innerHTML = '<div class="loading">Searching for ' + pokemonName + '...</div>';
+
+            try {
+                // Search Pokemon
+                const response = await fetch(`${API_URL}/pokemon/${pokemonName}`);
+                const data = await response.json();
+
+                console.log('API Response:', data);
+
+                if (data.success) {
+                    displayPokemon(data.data);
+                    
+                    messageDiv.innerHTML = '<div class="success">Pokemon found!</div>';
+                    setTimeout(() => {
+                        messageDiv.innerHTML = '';
+                    }, 2000);
+                    
+                    // History disabled - causes Pokemon display to disappear
+                    // recordSearch(pokemonName).then(() => {
+                    //     setTimeout(() => loadSearchHistory(), 500);
+                    // });
+                } else {
+                    messageDiv.innerHTML = `<div class="error">${data.message}</div>`;
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                messageDiv.innerHTML = '<div class="error">Pokemon not found or server error</div>';
+            }
+        }
+        function displayPokemon(pokemon) {
+    console.log('=== DISPLAYING POKEMON ===', pokemon);
+    
+    // Hide placeholder, show content
+    const placeholder = document.getElementById('pokemonPlaceholder');
+    const content = document.getElementById('pokemonContent');
+    
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+    
+    console.log('Placeholder hidden, content shown');
+    
+    // Image
+    const imageElement = document.getElementById('pokemonImage');
+    if (pokemon.image) {
+        imageElement.src = pokemon.image;
+        imageElement.alt = pokemon.name;
+        imageElement.style.display = 'block';
+        console.log('Image set to:', pokemon.image);
+    } else {
+        imageElement.style.display = 'none';
+    }
+    
+    // Name
+    document.getElementById('pokemonName').textContent = pokemon.name.toUpperCase();
+    
+    // Height and Weight
+    document.getElementById('pokemonHeight').textContent = pokemon.height || 'N/A';
+    document.getElementById('pokemonWeight').textContent = pokemon.weight || 'N/A';
+    
+    // Types
+    const typesDiv = document.getElementById('pokemonTypes');
+    if (pokemon.types && pokemon.types.length > 0) {
+        typesDiv.innerHTML = pokemon.types.map(type => 
+            `<span class="type-badge">${type}</span>`
+        ).join('');
+    } else {
+        typesDiv.innerHTML = '';
+    }
+    
+    // Stats
+    const statsDiv = document.getElementById('pokemonStats');
+    if (pokemon.stats && pokemon.stats.length > 0) {
+        statsDiv.innerHTML = pokemon.stats.map(stat => `
+            <div class="stat-item">
+                <div class="stat-name">${stat.name.replace('-', ' ')}</div>
+                <div class="stat-value">${stat.baseStat}</div>
+            </div>
+        `).join('');
+    } else {
+        statsDiv.innerHTML = '';
+    }
+    
+    console.log('Pokemon displayed successfully');
+    
+    // Monitor if something changes the display after
+    setTimeout(() => {
+        console.log('Check after 100ms - Content display:', content.style.display);
+        console.log('Check after 100ms - Placeholder display:', placeholder.style.display);
+    }, 100);
+    
+    setTimeout(() => {
+        console.log('Check after 600ms - Content display:', content.style.display);
+        console.log('Check after 600ms - Placeholder display:', placeholder.style.display);
+    }, 600);
+    
+    setTimeout(() => {
+        console.log('Check after 1500ms - Content display:', content.style.display);
+        console.log('Check after 1500ms - Placeholder display:', placeholder.style.display);
+    }, 1500);
+}
+
+        async function recordSearch(pokemonName) {
+            try {
+                const response = await fetch(`${API_URL}/search/record`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userId: currentUser.userId,
+                        pokemonName: pokemonName
+                    })
+                });
+                
+                const data = await response.json();
+                console.log('Search recorded:', data);
+            } catch (error) {
+                console.error('Error recording search:', error);
+            }
+        }
+
+        async function loadSearchHistory() {
+            try {
+                const response = await fetch(`${API_URL}/search/history/${currentUser.userId}`);
+                const data = await response.json();
+
+                const historyDiv = document.getElementById('historyList');
+
+                if (data.success && data.data.length > 0) {
+                    historyDiv.innerHTML = data.data.slice(0, 10).map(item => {
+                        const date = new Date(item.searchDate);
+                        const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                        
+                        return `
+                            <div class="history-item">
+                                <span class="history-pokemon">${item.pokemonName}</span>
+                                <span class="history-date">${formattedDate}</span>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    historyDiv.innerHTML = '<p style="text-align: center; color: #999;">No searches yet</p>';
+                }
+            } catch (error) {
+                console.error('Error loading history:', error);
+            }
+        }
+    </script>
+</body>
+</html>
+
+
